@@ -1,39 +1,7 @@
 #!/bin/bash
 
-for file in ./submissions/*
-do
-	cd ./submissions
-	mkdir checkfile
-	cd ../
 
-	k=0
-	exten="${file##*.}"
-	if [ "$exten" == "zip" ] ; then
-		unzip $file -d submissions/checkfile
-		k=1
-	elif [ "$exten" == "gz" ] || [ "$exten" == "tgz" ] || [ "$exten" == "tar" ]; then
-		tar -zxvf $file -C submissions/checkfile
-		k=1
-	elif [ "$exten" == "rar" ]; then
-		unrar $file 
-		mv search.py searchAgents.py -t submissions/checkfile
-	elif [ "$exten" == "7z" ]; then
-		7z x $file
-		mv search.py searchAgents.py -t submissions/checkfile	
-	else
-		continue
-	fi
-	
-	cd ./submissions/checkfile
-	count=$(ls | wc -l)
-	if [ $count != 2 ] ; then
-		echo $count
-		k=0
-	fi
-
-	cd ../
-
-	filename="${file##*/}"
+	filename=$1
 	#filename="${filename%%.*}"
 	filename2="${filename%_*}"
 	filename="${filename2%_*}".txt
@@ -41,10 +9,8 @@ do
 	filename2="${filename2#*_}"
 	echo $filename
 	
-	if [ -f checkfile/search.py ] && [ -f checkfile/searchAgents.py ] ; then
-		mv -t ../search_grade checkfile/search.py checkfile/searchAgents.py	
 
-		cd ../search_grade
+		cd search_grade
 		python autograder.py -t test_cases/q1/graph_backtrack > ../result/$filename
 		python autograder.py -t test_cases/q1/graph_bfs_vs_dfs >> ../result/$filename
 		python autograder.py -t test_cases/q1/graph_infinite >> ../result/$filename
@@ -97,12 +63,7 @@ do
 		mv searchAgents.py ../Check_Honesty/$filename2-searchAgents.py
 
 		cd ..
-		python grading_hw1.py ./result/$filename $k
+		python grading_hw1.py ./result/$filename $2
 
-		cd submissions
-	fi
 	
-	rm -r checkfile
-	cd ../
 		
-done
