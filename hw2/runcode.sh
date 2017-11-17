@@ -15,11 +15,12 @@ do
 		tar -zxvf $file -C submissions/checkfile
 		k=1
 	elif [ "$exten" == "rar" ]; then
-		unrar $file 
-		mv multiAgents.py -t submissions/checkfile
+		unrar e $file submissions/checkfile
+		#mv multiAgents.py -t submissions/checkfile
+
 	elif [ "$exten" == "7z" ]; then
-		7z x $file
-		mv multiAgents.py -t submissions/checkfile	
+		7z x $file -o submissions/checkfile
+		#mv multiAgents.py -t submissions/checkfile	
 	else
 		continue
 	fi
@@ -41,6 +42,14 @@ do
 	filename2="${filename2#*_}" # Eliminate the first string before "_"
 	echo $filename
 	
+	if [ -f checkfile/search.py ] ; then
+		mv -t ../multiagents_grade checkfile/search.py
+	fi
+
+	if [ -f checkfile/searchAgents.py ] ; then
+		mv -t ../multiagents_grade checkfile/searchAgents.py
+	fi
+
 	if [ -f checkfile/multiAgents.py ] ; then
 		mv -t ../multiagents_grade checkfile/multiAgents.py
 
@@ -48,13 +57,13 @@ do
 		python pacman.py -p ReflexAgent -l openClassic -n 10 -q > ../result/$filename
 		echo "*End Q1" >> ../result/$filename
 
-		python autograder.py -t test_cases/q2/8-pacman-game >> ../result/$filename
+		python autograder.py -q q2 --no-graphics >> ../result/$filename
 		echo "*End Q2" >> ../result/$filename
 
-		python autograder.py -t test_cases/q3/8-pacman-game  >> ../result/$filename
+		python autograder.py -q q3 --no-graphics  >> ../result/$filename
 		echo "*End Q3" >> ../result/$filename
 
-		python autograder.py -t test_cases/q4/7-pacman-game >> ../result/$filename
+		python autograder.py -q q4 --no-graphics >> ../result/$filename
 		echo "*End Q4" >> ../result/$filename
 
 		python pacman.py -l smallClassic -p ExpectimaxAgent -a evalFn=better -q -n 30 >> ../result/$filename
@@ -62,8 +71,15 @@ do
 
 		mv multiAgents.py ../Check_Honesty/$filename2-multiAgents.py 
 
+		if [ -f search.py ] ; then
+			rm search.py
+		fi
+		if [ -f searchAgents.py ] ; then
+			rm searchAgents.py
+		fi
+
 		cd ..
-		#python grading_hw2.py ./result/$filename $k
+		python grading_hw2.py ./result/$filename $k
 
 		cd submissions
 	fi
