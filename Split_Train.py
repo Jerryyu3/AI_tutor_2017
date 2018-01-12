@@ -14,7 +14,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.model_selection import GridSearchCV, StratifiedKFold
 from sklearn.metrics import average_precision_score
 
-top_M = 1000
+top_M = 500
 
 class History(Callback):
     def on_train_begin(self,logs={}):
@@ -71,20 +71,21 @@ def preprocessing(fileName, oneHot, ifTrain):
         prev_5 = np_utils.to_categorical(X_raw[:,10],12);
         prev_6 = np_utils.to_categorical(X_raw[:,11],12);
 
-
-        #X = np.concatenate((np.transpose([X_raw[:,1]]),sex,edu,martial,np.transpose([X_raw[:,5]]), 
-        #    prev_1,prev_2,prev_3,prev_4,prev_5,prev_6,X_raw[:,12:]),axis=1)
-        X = np.concatenate((np.transpose([X_raw[:,1]]),sex,edu,martial,np.transpose([X_raw[:,5]]), 
-            prev_1,prev_2,prev_3,prev_4,prev_5, np.transpose([X_raw[:,12]/X_raw[:,1]]), np.transpose([(X_raw[:,13]-X_raw[:,18])/X_raw[:,1]]),
-            np.transpose([(X_raw[:,14]-X_raw[:,19])/X_raw[:,1]]), np.transpose([(X_raw[:,15]-X_raw[:,20])/X_raw[:,1]]), 
-            np.transpose([(X_raw[:,16]-X_raw[:,21])/X_raw[:,1]]), np.transpose([(X_raw[:,17]-X_raw[:,22])/X_raw[:,1]])),axis=1)
-        #X = np.concatenate((sex,edu,martial,prev_1,prev_2,prev_3,prev_4,prev_5,prev_6),axis=1)
+        XDD = X_raw[:,12:]/np.transpose([X_raw[:,1]])
+        X = np.concatenate((np.transpose([X_raw[:,1]]), sex, edu, martial, np.transpose([X_raw[:,5]]), 
+            prev_1, prev_2, prev_3, prev_4, prev_5, prev_6, XDD), axis=1)
+            #X_raw[:,12:]),axis=1)
+        #X = np.concatenate((np.transpose([X_raw[:,1]]), sex, edu, martial, np.transpose([X_raw[:,5]]), 
+        #    prev_1, prev_2, prev_3, prev_4, np.transpose([X_raw[:,12]/X_raw[:,1]]), np.transpose([(X_raw[:,13]-X_raw[:,18])/X_raw[:,1]]),
+        #    np.transpose([(X_raw[:,14]-X_raw[:,19])/X_raw[:,1]]), np.transpose([(X_raw[:,15]-X_raw[:,20])/X_raw[:,1]]), 
+        #    np.transpose([(X_raw[:,16]-X_raw[:,21])/X_raw[:,1]]), np.transpose([(X_raw[:,17]-X_raw[:,22])/X_raw[:,1]])),axis=1)
+        #X = np.concatenate((sex, edu, martial, prev_1, prev_2, prev_3, prev_4, prev_5, prev_6), axis=1)
 
     else:
         X = X_raw
 
     if(ifTrain): 
-        val_split = 18000
+        val_split = 20000
         X_val = X[val_split:,:]; X_train = X[:val_split,:]
         Y_val = Y[val_split:,:]; Y_train = Y[:val_split,:]
         return X_train, X_val, Y_train, Y_val
@@ -110,13 +111,13 @@ def shuffle(X, Y):
     np.random.shuffle(randomize)
     return (X[randomize], Y[randomize])
 
-def logistic(X_train, X_val, X_test, Y_train, Y_val):
+def logistic(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val):
 
     W = np.zeros((96+1, 1))
     #table = computeMean_Var(np.concatenate((X_train, X_test), axis=0))
     table = computeMean_Var(X_train) 
 
-    normalize(X_train, table); normalize(X_test, table)
+    normalize(X_train, table); normalize(X_test_public, table)
     X_train = np.insert(X_train, 0, 1, axis=1)
     X_test = np.insert(X_test, 0, 1, axis=1)
 
@@ -145,9 +146,9 @@ def logistic(X_train, X_val, X_test, Y_train, Y_val):
         epoch += 1;
         if (conti > 10): break;
 
-    output = (sigmoid(np.dot(X_test,W)) > 0.5); output = output.astype(int)
-    print (output)
-    check_answer(output, 'Test_2_ans.csv')
+    #output = (sigmoid(np.dot(X_test_public,W)) > 0.5); output = output.astype(int)
+    #print (output)
+    #check_answer(output, 'Test_2_ans.csv')
 
 def check_answer(output, fileName):
     data = np.delete(np.genfromtxt(fileName, delimiter=','), [0], 0)
@@ -158,19 +159,31 @@ def check_answer(output, fileName):
    
 def MAP_eval(output, fileName, M):
     data = np.delete(np.genfromtxt(fileName, delimiter=','), [0], 0)
-    Y_test = np.transpose([data[:,1]])
-    #print(Y_test[:M,:], output[:M,1])
+    Y_yes = np.transpose([data])
+    #Y_yes = (np.where(Y_test == 1))
+    #Y_yes = np.transpose([Y_yes[0]+1])
 
-    print ("Average Precision: " + str(average_precision_score(Y_test[:M,:], output[:M,1])))
+    correct_ans = 0.0; answer = 0.0
+    for i in range(M):
+        if output[i, 0] in Y_yes: 
+            correct_ans += 1.0
+        answer += (correct_ans/(i+1))
+    print ("Average Precision: " + str(answer/M))
+    #print ("Average Precision: " + str(average_precision_score(Y_test[:M,:], output[:M,1])))
 
-def random_forest(X_train, X_val, X_test, Y_train, Y_val):
+def predict(output, name):
+    print ("Output predict.csv!")
+    np.savetxt(name, output[:, 0], fmt=['%d'], delimiter=",")
+
+def random_forest(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val):
 
     table = computeMean_Var(X_train) 
-    normalize(X_train, table); normalize(X_test, table)
+    normalize(X_train, table); normalize(X_test_public, table); normalize(X_test_private, table)
 
+    print (np.shape(X_train))
     parameter_gridsearch = {
         'max_depth' : [5, 10, 15],  #depth of each decision tree
-        'n_estimators': [125, 150, 200],  #count of decision tree
+        'n_estimators': [250, 300, 400, 500],  #count of decision tree
         #'max_features': ['sqrt', 'log2'], 
         'min_samples_split': [2],
         #'min_samples_leaf': [1, 3, 4],
@@ -191,21 +204,30 @@ def random_forest(X_train, X_val, X_test, Y_train, Y_val):
     print(parameters)
 
     print(1-np.mean(Y_train[:,0]),'Best Score: {}'.format(gridsearch.best_score_))
-    output = gridsearch.predict(X_test); output = np.transpose([output]);
-    check_answer(output, 'Test_2_ans.csv')
+    #output = gridsearch.predict(X_test_public); output = np.transpose([output])
+    #check_answer(output, 'Test_2_ans.csv')
 
-    prob_output = gridsearch.predict_proba(X_test)
-    MAP_eval(prob_output, 'Test_2_ans.csv', top_M)
+    prob_output = gridsearch.predict_proba(X_test_public)
+    prob_output[:, 0] = np.arange(1,5001)
+    prob_output = prob_output[(-prob_output[:, 1]).argsort()]
+    MAP_eval(prob_output, 'Test_Ans_Public.csv', top_M)
+    predict(prob_output, 'public.csv') # Output the public.csv
+
+    prob_output = gridsearch.predict_proba(X_test_private)
+    prob_output[:, 0] = np.arange(5001,10001)
+    prob_output = prob_output[(-prob_output[:, 1]).argsort()]
+    MAP_eval(prob_output, 'Test_Ans_Private.csv', top_M)
+    predict(prob_output, 'private.csv') # Output the private.csv
 
     output = gridsearch.predict(X_train)
     print (1-np.mean(Y_train[:,0]),np.mean(output==Y_train[:,0]))
     
-    print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
+    #print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
 
-def adaptive_boosting(X_train, X_val, X_test, Y_train, Y_val):
+def adaptive_boosting(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val):
 
     table = computeMean_Var(X_train) 
-    normalize(X_train, table); normalize(X_test, table)
+    normalize(X_train, table); normalize(X_test_public, table)
 
     parameter_gridsearch = {
         'n_estimators': [300],  #count of decision tree
@@ -228,18 +250,18 @@ def adaptive_boosting(X_train, X_val, X_test, Y_train, Y_val):
 
     print(1-np.mean(Y_train[:,0]),'Best Score: {}'.format(gridsearch.best_score_))
     
-    output = gridsearch.predict(X_test); output = np.transpose([output]);
-    check_answer(output, 'Test_2_ans.csv')
+    output = gridsearch.predict(X_test_public); output = np.transpose([output]);
+    #check_answer(output, 'Test_2_ans.csv')
 
     output = gridsearch.predict(X_train)
     print (1-np.mean(Y_train[:,0]),np.mean(output==Y_train[:,0]))
 
-    print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
+    #print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
 
-def KNN(X_train, X_val, X_test, Y_train, Y_val):
+def KNN(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val):
 
     table = computeMean_Var(X_train) 
-    normalize(X_train, table); normalize(X_test, table)
+    normalize(X_train, table); normalize(X_test_public, table)
     
     parameter_gridsearch = {
         'n_neighbors':[12, 25, 37],
@@ -258,18 +280,18 @@ def KNN(X_train, X_val, X_test, Y_train, Y_val):
  
     print(1-np.mean(Y_train[:,0]),'Best Score: {}'.format(gridsearch.best_score_))
     
-    output = gridsearch.predict(X_test);  output = np.transpose([output]);
-    check_answer(output, 'Test_2_ans.csv')
+    output = gridsearch.predict(X_test_public);  output = np.transpose([output]);
+    #check_answer(output, 'Test_2_ans.csv')
 
     output = gridsearch.predict(X_train)
     print (1-np.mean(Y_train[:,0]), np.mean(output==Y_train[:,0]))
 
     print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
 
-def sklearn_logistic(X_train, X_val, X_test, Y_train, Y_val):
+def sklearn_logistic(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val):
 
     table = computeMean_Var(X_train) 
-    normalize(X_train, table); normalize(X_test, table)
+    normalize(X_train, table); normalize(X_test_public, table)
 
     parameter_gridsearch = {
         'C':[1.5, 2.0, 2.5],
@@ -292,18 +314,18 @@ def sklearn_logistic(X_train, X_val, X_test, Y_train, Y_val):
 
     #print(1-np.mean(Y_train[:,0]),'Best Score: {}'.format(gridsearch.best_score_))
     
-    output = gridsearch.predict(X_test); output = np.transpose([output]);
-    check_answer(output, 'Test_2_ans.csv')
+    output = gridsearch.predict(X_test_public); output = np.transpose([output]);
+    #check_answer(output, 'Test_2_ans.csv')
 
-    prob_output = gridsearch.predict_proba(X_test)
-    MAP_eval(prob_output, 'Test_2_ans.csv', top_M)
+    prob_output = gridsearch.predict_proba(X_test_public)
+    #MAP_eval(prob_output, 'Test_2_ans.csv', top_M)
 
     output = gridsearch.predict(X_train)
     print (1-np.mean(Y_train[:,0]), np.mean(output==Y_train[:,0]))
 
-    print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
+    #print(np.mean((output != Y_train[:,0]) * (output == 1)), np.mean((output != Y_train[:,0]) * (output == 0) * (X_train[:,12] == 1)))
 
-def ANN(X_train, X_val, X_test, Y_train, Y_val):
+def ANN(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val):
     
     '''
     base_dir = (os.path.dirname(os.path.realpath(__file__)))
@@ -321,14 +343,14 @@ def ANN(X_train, X_val, X_test, Y_train, Y_val):
             store_path = os.path.join(exp_dir,log_path+str(dir_cnt))
     '''
     table = computeMean_Var(X_train) 
-    normalize(X_train, table); normalize(X_val, table); normalize(X_test, table)
+    normalize(X_train, table); normalize(X_val, table); normalize(X_test_public, table)
 
     Y_train = np_utils.to_categorical(Y_train, 2)
     Y_val = np_utils.to_categorical(Y_val, 2)
 
     model = Sequential()
 
-    model.add(Dense(input_dim=96,units=512));
+    model.add(Dense(input_dim=72, units=512));
     model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None));
     model.add(Dense(units=256));
     model.add(keras.layers.advanced_activations.PReLU(alpha_initializer='zero', weights=None));
@@ -355,9 +377,11 @@ def ANN(X_train, X_val, X_test, Y_train, Y_val):
     nb_epoch = 100; b_size = 64
     hist = model.fit(X_train, Y_train, validation_data=(X_val, Y_val), epochs=nb_epoch, batch_size=b_size, callbacks=[earlystopping, checkpoint])
 
-    output = model.predict(X_test)
-    output = output.argmax(axis=1); output = np.transpose([output]);
-    check_answer(output, 'Test_2_ans.csv')
+    prob_output = model.predict(X_test_public)
+    output = prob_output.argmax(axis=1); output = np.transpose([output]);
+    #check_answer(output, 'Test_2_ans.csv')
+
+    #MAP_eval(prob_output, 'Test_2_ans.csv', top_M)
 
     #history = History();
     #filepath = os.path.join(store_path,'model.{epoch:03d}-{val_acc:.4f}.h5');
@@ -370,14 +394,15 @@ if __name__ == '__main__':
 
     oneHot = 1
     X_train, X_val, Y_train, Y_val = preprocessing(sys.argv[1], oneHot, True)
-    X_test = preprocessing(sys.argv[2], oneHot, False)
+    X_test_public = preprocessing(sys.argv[2], oneHot, False)
+    X_test_private = preprocessing(sys.argv[3], oneHot, False)
 
-    random_forest(X_train, X_val, X_test, Y_train, Y_val)
-    #logistic(X_train, X_val, X_test, Y_train, Y_val)
-    #adaptive_boosting(X_train, X_val, X_test, Y_train, Y_val)
-    #KNN(X_train, X_val, X_test, Y_train, Y_val)
-    #sklearn_logistic(X_train, X_val, X_test, Y_train, Y_val)
-    #ANN(X_train, X_val, X_test, Y_train, Y_val)
+    random_forest(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val)
+    #logistic(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val)
+    #adaptive_boosting(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val)
+    #KNN(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val)
+    #sklearn_logistic(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val)
+    #ANN(X_train, X_val, X_test_public, X_test_private, Y_train, Y_val)
    
 
 

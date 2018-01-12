@@ -1,0 +1,9 @@
+Documentation Score: 2.0
+Public Score: 4.0
+Public Leaderboard score: 0.79912
+Public Reproduce score: 0.7898012406
+Private Score: 2.5
+Private Leaderboard score: 0.7977226688
+Rank Score: 0.5
+
+Total Score: 9.0

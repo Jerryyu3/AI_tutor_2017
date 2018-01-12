@@ -1,0 +1,9 @@
+Documentation Score: 2.0 x 0.85 = 1.7(Late for one day)
+Public Score: 4.0
+Public Leaderboard score: 0.79352
+Public Reproduce score: 0.7888190776
+Private Score: 2.5
+Private Leaderboard score: 0.809133906
+Rank Score: 1.0
+
+Total Score: 9.2
